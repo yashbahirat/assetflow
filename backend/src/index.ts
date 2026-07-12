@@ -9,6 +9,8 @@ import categoryRoutes from './routes/categoryRoutes';
 import userRoutes from './routes/userRoutes';
 import assetRoutes from './routes/assetRoutes';
 import allocationRoutes from './routes/allocationRoutes';
+import bookingRoutes from './routes/bookingRoutes';
+import maintenanceRoutes from './routes/maintenanceRoutes';
 
 dotenv.config();
 
@@ -29,6 +31,8 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/allocations', allocationRoutes);
+app.use('/api/bookings', bookingRoutes);
+app.use('/api/maintenance', maintenanceRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
