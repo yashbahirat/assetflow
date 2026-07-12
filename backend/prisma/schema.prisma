@@ -1,0 +1,155 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String               @id @default(uuid())
+  email               String               @unique
+  passwordHash        String
+  firstName           String
+  lastName            String
+  role                String               @default("EMPLOYEE")
+  departmentId        String?
+  department          Department?          @relation(fields: [departmentId], references: [id])
+  allocations         Allocation[]
+  transferRequestsOut TransferRequest[]    @relation("RequestedBy")
+  transferRequestsIn  TransferRequest[]    @relation("TargetUser")
+  bookings            Booking[]
+  maintenanceRequests MaintenanceRequest[]
+  auditItems          AuditItem[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+}
+
+model Department {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  isActive    Boolean  @default(true)
+  users       User[]
+  allocations Allocation[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AssetCategory {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  assets      Asset[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Asset {
+  id                  String               @id @default(uuid())
+  tag                 String               @unique
+  serialNumber        String?
+  name                String
+  condition           String?
+  location            String?
+  isShared            Boolean              @default(false)
+  status              String               @default("AVAILABLE")
+  categoryId          String
+  category            AssetCategory        @relation(fields: [categoryId], references: [id])
+  allocations         Allocation[]
+  transferRequests    TransferRequest[]
+  bookings            Booking[]
+  maintenanceRequests MaintenanceRequest[]
+  auditItems          AuditItem[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+}
+
+model Allocation {
+  id                 String    @id @default(uuid())
+  assetId            String
+  asset              Asset     @relation(fields: [assetId], references: [id])
+  userId             String?
+  user               User?     @relation(fields: [userId], references: [id])
+  departmentId       String?
+  department         Department? @relation(fields: [departmentId], references: [id])
+  allocatedAt        DateTime  @default(now())
+  expectedReturnDate DateTime?
+  returnedAt         DateTime?
+  status             String           @default("ACTIVE")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+model TransferRequest {
+  id           String   @id @default(uuid())
+  assetId      String
+  asset        Asset    @relation(fields: [assetId], references: [id])
+  requestedById String
+  requestedBy  User     @relation("RequestedBy", fields: [requestedById], references: [id])
+  targetUserId  String?
+  targetUser    User?    @relation("TargetUser", fields: [targetUserId], references: [id])
+  status       String        @default("PENDING")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Booking {
+  id          String   @id @default(uuid())
+  assetId     String
+  asset       Asset    @relation(fields: [assetId], references: [id])
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  startTime   DateTime
+  endTime     DateTime
+  status      String        @default("CONFIRMED")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model MaintenanceRequest {
+  id          String   @id @default(uuid())
+  assetId     String
+  asset       Asset    @relation(fields: [assetId], references: [id])
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  description String
+  status      String        @default("PENDING")
+  resolvedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AuditCycle {
+  id          String   @id @default(uuid())
+  name        String
+  startDate   DateTime
+  endDate     DateTime?
+  status      String      @default("IN_PROGRESS")
+  items       AuditItem[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AuditItem {
+  id          String   @id @default(uuid())
+  auditId     String
+  audit       AuditCycle @relation(fields: [auditId], references: [id])
+  assetId     String
+  asset       Asset    @relation(fields: [assetId], references: [id])
+  auditorId   String
+  auditor     User     @relation(fields: [auditorId], references: [id])
+  status      String      @default("PENDING")
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+
+
+
+
+
+
+
+
