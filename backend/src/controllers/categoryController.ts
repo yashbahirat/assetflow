@@ -33,7 +33,7 @@ export const createCategory = async (req: Request, res: Response): Promise<void>
 
 export const updateCategory = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const { id } = req.params as Record<string, string>;
     const { name, description } = req.body;
 
     const updated = await prisma.assetCategory.update({

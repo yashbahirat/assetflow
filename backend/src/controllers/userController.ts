@@ -25,7 +25,7 @@ export const getUsers = async (req: Request, res: Response): Promise<void> => {
 
 export const updateUserRole = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const { id } = req.params as Record<string, string>;
     const { role } = req.body;
 
     const validRoles = ['EMPLOYEE', 'DEPARTMENT_HEAD', 'ASSET_MANAGER', 'ADMIN'];

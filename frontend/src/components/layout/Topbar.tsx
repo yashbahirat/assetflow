@@ -17,6 +17,7 @@ export function Topbar() {
   const { user, logout } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
+  const [upcomingReminder, setUpcomingReminder] = useState<any>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
   const getInitials = () => {
@@ -40,6 +41,37 @@ export function Topbar() {
   }, [user]);
 
   useEffect(() => {
+    if (!user) return;
+    
+    const checkBookings = async () => {
+      try {
+        const { data } = await api.get('/bookings');
+        const now = new Date();
+        const next15 = new Date(now.getTime() + 15 * 60000);
+        
+        const myUpcoming = data.bookings.filter((b: any) => {
+          if (b.userId !== user.id) return false;
+          if (b.status === 'CANCELLED') return false;
+          const start = new Date(b.startTime);
+          return start > now && start <= next15;
+        });
+
+        if (myUpcoming.length > 0) {
+          setUpcomingReminder(myUpcoming[0]);
+        } else {
+          setUpcomingReminder(null);
+        }
+      } catch (e) {
+        console.error('Failed to check upcoming bookings', e);
+      }
+    };
+    
+    checkBookings();
+    const int = setInterval(checkBookings, 60000);
+    return () => clearInterval(int);
+  }, [user]);
+
+  useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
         setShowNotifications(false);
@@ -50,8 +82,14 @@ export function Topbar() {
   }, []);
 
   return (
-    <div className="sticky top-0 z-10 flex h-16 flex-shrink-0 items-center gap-x-4 border-b bg-white px-6 shadow-sm">
-      <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
+    <>
+      {upcomingReminder && (
+        <div className="bg-indigo-600 px-4 py-2 text-white text-center text-sm font-medium sticky top-0 z-20 shadow-md flex items-center justify-center gap-2">
+          <Bell className="h-4 w-4" /> Reminder: You have an upcoming booking for {upcomingReminder.asset.name} starting at {new Date(upcomingReminder.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+        </div>
+      )}
+      <div className="sticky top-0 z-10 flex h-16 flex-shrink-0 items-center gap-x-4 border-b bg-white px-6 shadow-sm">
+        <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
         <form className="relative flex flex-1" action="#" method="GET">
           <label htmlFor="search-field" className="sr-only">
             Search
@@ -128,5 +166,6 @@ export function Topbar() {
         </div>
       </div>
     </div>
+    </>
   );
 }

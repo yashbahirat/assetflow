@@ -57,6 +57,9 @@ model Asset {
   status              String               @default("AVAILABLE")
   categoryId          String
   category            AssetCategory        @relation(fields: [categoryId], references: [id])
+  acquisitionDate     DateTime?
+  acquisitionCost     Float?
+  photoUrl            String?
   allocations         Allocation[]
   transferRequests    TransferRequest[]
   bookings            Booking[]
@@ -77,6 +80,7 @@ model Allocation {
   allocatedAt        DateTime  @default(now())
   expectedReturnDate DateTime?
   returnedAt         DateTime?
+  returnNotes        String?
   status             String           @default("ACTIVE")
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
@@ -109,24 +113,31 @@ model Booking {
 }
 
 model MaintenanceRequest {
-  id          String   @id @default(uuid())
-  assetId     String
-  asset       Asset    @relation(fields: [assetId], references: [id])
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  description String
-  status      String        @default("PENDING")
-  resolvedAt  DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String   @id @default(uuid())
+  assetId         String
+  asset           Asset    @relation(fields: [assetId], references: [id])
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  description     String
+  priority        String   @default("MEDIUM")
+  photoUrl        String?
+  technicianName  String?
+  notes           String?
+  status          String   @default("PENDING")
+  resolvedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model AuditCycle {
   id          String   @id @default(uuid())
   name        String
+  scopeType   String?  // "ALL" | "DEPARTMENT" | "LOCATION"
+  scopeValue  String?  // department name or location string
   startDate   DateTime
   endDate     DateTime?
   status      String      @default("IN_PROGRESS")
+  auditorIds  String?  // JSON-encoded array of auditor user IDs
   items       AuditItem[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

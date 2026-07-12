@@ -33,7 +33,7 @@ export const createDepartment = async (req: Request, res: Response): Promise<voi
 
 export const updateDepartment = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const { id } = req.params as Record<string, string>;
     const { name, isActive } = req.body;
 
     const updated = await prisma.department.update({

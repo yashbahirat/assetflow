@@ -1,22 +1,26 @@
 "use client";
 
-import { Home, Package, Users, Building2, Settings, MonitorCheck, ClipboardCheck } from "lucide-react";
+import { Home, Package, Users, Building2, Settings, MonitorCheck, ClipboardCheck, CalendarDays, BarChart3, Bell, ArrowRightLeft, Wrench } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
   { name: 'Assets', href: '/assets', icon: Package },
-  { name: 'Directory', href: '/directory', icon: Users },
-  { name: 'Departments', href: '/departments', icon: Building2 },
-  { name: 'Maintenance', href: '/maintenance', icon: MonitorCheck },
+  { name: 'Bookings', href: '/bookings', icon: CalendarDays },
+  { name: 'Transfers', href: '/transfers', icon: ArrowRightLeft },
+  { name: 'Maintenance', href: '/maintenance', icon: Wrench },
   { name: 'Audits', href: '/audits', icon: ClipboardCheck },
-  { name: 'Settings', href: '/settings', icon: Settings },
+  { name: 'Reports', href: '/reports', icon: BarChart3 },
+  { name: 'Notifications', href: '/notifications', icon: Bell },
+  { name: 'Organization', href: '/departments', icon: Building2, adminOnly: true },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { user } = useAuth();
 
   return (
     <div className="flex h-full w-64 flex-col border-r bg-white">
@@ -31,8 +35,17 @@ export function Sidebar() {
       <div className="flex flex-1 flex-col overflow-y-auto px-4 py-4">
         <nav className="flex-1 space-y-1">
           {navigation.map((item) => {
+            // Role-based visibility
+            if ((item as any).adminOnly && user?.role !== 'ADMIN') return null;
+            if (['Audits', 'Reports'].includes(item.name) && (!user || (user.role !== 'ADMIN' && user.role !== 'ASSET_MANAGER'))) {
+              return null;
+            }
+            if (['Transfers'].includes(item.name) && (!user || (user.role !== 'ADMIN' && user.role !== 'ASSET_MANAGER' && user.role !== 'DEPARTMENT_HEAD'))) {
+              return null;
+            }
+
             const Icon = item.icon;
-            const isCurrent = pathname === item.href;
+            const isCurrent = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
             return (
               <Link
                 key={item.name}

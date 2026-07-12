@@ -36,6 +36,8 @@ export default function AssetsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
+  const [isSharedFilter, setIsSharedFilter] = useState('');
 
   // Slide-over state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -48,7 +50,10 @@ export default function AssetsPage() {
     categoryId: '',
     condition: 'NEW',
     location: '',
-    isShared: false
+    isShared: false,
+    acquisitionDate: '',
+    acquisitionCost: '',
+    photoUrl: ''
   });
   const [formError, setFormError] = useState('');
 
@@ -59,6 +64,8 @@ export default function AssetsPage() {
       if (searchQuery) params.append('tag', searchQuery);
       if (statusFilter) params.append('status', statusFilter);
       if (categoryFilter) params.append('categoryId', categoryFilter);
+      if (locationFilter) params.append('location', locationFilter);
+      if (isSharedFilter) params.append('isShared', isSharedFilter);
 
       const { data } = await api.get(`/assets?${params.toString()}`);
       setAssets(data.assets);
@@ -88,7 +95,7 @@ export default function AssetsPage() {
       fetchAssets();
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, statusFilter, categoryFilter]);
+  }, [searchQuery, statusFilter, categoryFilter, locationFilter, isSharedFilter]);
 
   const handleCreateAsset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,7 +103,7 @@ export default function AssetsPage() {
     try {
       await api.post('/assets', newAsset);
       setIsDrawerOpen(false);
-      setNewAsset({ tag: '', serial: '', name: '', categoryId: '', condition: 'NEW', location: '', isShared: false });
+      setNewAsset({ tag: '', serial: '', name: '', categoryId: '', condition: 'NEW', location: '', isShared: false, acquisitionDate: '', acquisitionCost: '', photoUrl: '' });
       fetchAssets();
     } catch (err: any) {
       setFormError(err.response?.data?.error || 'Failed to create asset');
@@ -141,10 +148,19 @@ export default function AssetsPage() {
               </div>
               <input
                 type="text"
-                placeholder="Search by asset tag..."
+                placeholder="Search by name, tag, or serial number..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="block w-full rounded-md border-0 py-2 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+              />
+            </div>
+            <div className="relative flex-1 w-full">
+              <input
+                type="text"
+                placeholder="Filter by location..."
+                value={locationFilter}
+                onChange={(e) => setLocationFilter(e.target.value)}
+                className="block w-full rounded-md border-0 py-2 pl-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
               />
             </div>
             <select
@@ -165,8 +181,20 @@ export default function AssetsPage() {
               <option value="">All Statuses</option>
               <option value="AVAILABLE">Available</option>
               <option value="ALLOCATED">Allocated</option>
-              <option value="MAINTENANCE">Maintenance</option>
+              <option value="RESERVED">Reserved</option>
+              <option value="MAINTENANCE">Under Maintenance</option>
+              <option value="LOST">Lost</option>
               <option value="RETIRED">Retired</option>
+              <option value="DISPOSED">Disposed</option>
+            </select>
+            <select
+              value={isSharedFilter}
+              onChange={(e) => setIsSharedFilter(e.target.value)}
+              className="block w-full sm:w-40 rounded-md border-0 py-2 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6"
+            >
+              <option value="">All Resources</option>
+              <option value="true">Shared (Bookable)</option>
+              <option value="false">Non-Shared</option>
             </select>
           </div>
 
@@ -212,11 +240,15 @@ export default function AssetsPage() {
                             <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{asset.category.name}</td>
                             <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                               <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${
-                                asset.status === 'AVAILABLE' ? 'bg-green-50 text-green-700 ring-green-600/20' :
-                                asset.status === 'ALLOCATED' ? 'bg-blue-50 text-blue-700 ring-blue-700/10' :
+                                asset.status === 'AVAILABLE'    ? 'bg-green-50 text-green-700 ring-green-600/20' :
+                                asset.status === 'ALLOCATED'    ? 'bg-blue-50 text-blue-700 ring-blue-700/10' :
+                                asset.status === 'MAINTENANCE'  ? 'bg-yellow-50 text-yellow-700 ring-yellow-600/20' :
+                                asset.status === 'RESERVED'     ? 'bg-purple-50 text-purple-700 ring-purple-600/20' :
+                                asset.status === 'LOST'         ? 'bg-red-50 text-red-700 ring-red-600/20' :
+                                asset.status === 'RETIRED'      ? 'bg-orange-50 text-orange-700 ring-orange-600/20' :
                                 'bg-gray-50 text-gray-600 ring-gray-500/10'
                               }`}>
-                                {asset.status}
+                                {asset.status === 'MAINTENANCE' ? 'Under Maintenance' : asset.status.charAt(0) + asset.status.slice(1).toLowerCase()}
                               </span>
                             </td>
                             <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{asset.location || '-'}</td>
@@ -266,14 +298,13 @@ export default function AssetsPage() {
                       <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg">{formError}</div>
                     )}
                     <div>
-                      <label className="block text-sm font-medium leading-6 text-gray-900">Asset Tag *</label>
+                      <label className="block text-sm font-medium leading-6 text-gray-900">Asset Tag</label>
                       <input
-                        required
                         type="text"
                         value={newAsset.tag}
                         onChange={e => setNewAsset({...newAsset, tag: e.target.value})}
                         className="mt-1 block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                        placeholder="e.g. LPT-001"
+                        placeholder="Leave blank to auto-generate"
                       />
                     </div>
                     <div>
@@ -345,6 +376,36 @@ export default function AssetsPage() {
                       <label htmlFor="isShared" className="ml-2 block text-sm leading-6 text-gray-900">
                         This is a shared resource (bookable)
                       </label>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium leading-6 text-gray-900">Acquisition Date</label>
+                      <input
+                        type="date"
+                        value={newAsset.acquisitionDate}
+                        onChange={e => setNewAsset({...newAsset, acquisitionDate: e.target.value})}
+                        className="mt-1 block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium leading-6 text-gray-900">Acquisition Cost ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={newAsset.acquisitionCost}
+                        onChange={e => setNewAsset({...newAsset, acquisitionCost: e.target.value})}
+                        className="mt-1 block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                        placeholder="e.g. 1500.00"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium leading-6 text-gray-900">Photo URL</label>
+                      <input
+                        type="url"
+                        value={newAsset.photoUrl}
+                        onChange={e => setNewAsset({...newAsset, photoUrl: e.target.value})}
+                        className="mt-1 block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                        placeholder="https://example.com/photo.jpg"
+                      />
                     </div>
                   </form>
                 </div>

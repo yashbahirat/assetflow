@@ -51,7 +51,7 @@ export const allocateAsset = async (req: Request, res: Response): Promise<void> 
 
 export const requestTransfer = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id: assetId } = req.params;
+    const { id: assetId } = req.params as Record<string, string>;
     const { targetUserId } = req.body;
     const requestedById = req.user?.userId;
 
@@ -83,7 +83,7 @@ export const requestTransfer = async (req: Request, res: Response): Promise<void
 
 export const approveTransfer = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id: transferRequestId } = req.params;
+    const { id: transferRequestId } = req.params as Record<string, string>;
 
     const request = await prisma.transferRequest.findUnique({ where: { id: transferRequestId } });
     if (!request || request.status !== 'PENDING') {
@@ -122,7 +122,7 @@ export const approveTransfer = async (req: Request, res: Response): Promise<void
 
 export const returnAsset = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id: allocationId } = req.params;
+    const { id: allocationId } = req.params as Record<string, string>;
 
     const allocation = await prisma.allocation.findUnique({ where: { id: allocationId } });
     if (!allocation || allocation.status !== 'ACTIVE') {
@@ -146,4 +146,38 @@ export const returnAsset = async (req: Request, res: Response): Promise<void> =>
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }
+};
+
+export const rejectTransfer = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params as Record<string, string>;
+    const request = await prisma.transferRequest.findUnique({ where: { id } });
+    if (!request || request.status !== 'PENDING') { res.status(404).json({ error: 'Valid pending transfer request not found' }); return; }
+    await prisma.transferRequest.update({ where: { id }, data: { status: 'REJECTED' } });
+    res.status(200).json({ message: 'Transfer rejected' });
+  } catch (error) { res.status(500).json({ error: 'Internal error' }); }
+};
+
+export const getTransferRequests = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const requests = await prisma.transferRequest.findMany({
+      where: { status: 'PENDING' },
+      include: { asset: true, requestedBy: true, targetUser: true },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.status(200).json({ requests });
+  } catch (error) { res.status(500).json({ error: 'Internal error' }); }
+};
+
+export const getOverdueAllocations = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const overdue = await prisma.allocation.findMany({
+      where: {
+        status: 'ACTIVE',
+        expectedReturnDate: { lt: new Date() }
+      },
+      include: { asset: true, user: true, department: true }
+    });
+    res.status(200).json({ overdue });
+  } catch (error) { res.status(500).json({ error: 'Internal error' }); }
 };

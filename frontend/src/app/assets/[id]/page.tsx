@@ -15,9 +15,24 @@ interface AssetHistoryEvent {
   status: string;
   allocatedAt: string;
   returnedAt: string | null;
+  returnNotes: string | null;
   expectedReturnAt: string | null;
   assignedUser: string | null;
+  assignedUserId: string | null;
   assignedDept: string | null;
+}
+
+interface AssetMaintenanceEvent {
+  id: string;
+  description: string;
+  status: string;
+  priority: string;
+  createdAt: string;
+  resolvedAt: string | null;
+  technicianName: string | null;
+  notes: string | null;
+  photoUrl?: string;
+  reportedBy: string | null;
 }
 
 interface Booking {
@@ -38,6 +53,9 @@ interface AssetDetail {
   status: string;
   isShared: boolean;
   category: { id: string; name: string };
+  acquisitionDate: string | null;
+  acquisitionCost: number | null;
+  photoUrl: string | null;
 }
 
 export default function AssetDetailPage() {
@@ -47,6 +65,7 @@ export default function AssetDetailPage() {
   
   const [asset, setAsset] = useState<AssetDetail | null>(null);
   const [history, setHistory] = useState<AssetHistoryEvent[]>([]);
+  const [maintenanceHistory, setMaintenanceHistory] = useState<AssetMaintenanceEvent[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -54,14 +73,16 @@ export default function AssetDetailPage() {
   // Actions State
   const [showAllocateModal, setShowAllocateModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showReturnModal, setShowReturnModal] = useState(false);
   const [showBookModal, setShowBookModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [reportData, setReportData] = useState({ description: '', priority: 'MEDIUM', photoUrl: '' });
   
   // Forms State
   const [allocateData, setAllocateData] = useState({ userId: '', departmentId: '', expectedReturnDate: '' });
   const [transferData, setTransferData] = useState({ targetUserId: '' });
+  const [returnData, setReturnData] = useState({ returnNotes: '' });
   const [bookData, setBookData] = useState({ startTime: '', endTime: '' });
-  const [reportData, setReportData] = useState({ description: '' });
   
   // Data for Selects
   const [users, setUsers] = useState<any[]>([]);
@@ -72,6 +93,7 @@ export default function AssetDetailPage() {
       const { data } = await api.get(`/assets/${params.id}/history`);
       setAsset(data.asset);
       setHistory(data.history);
+      setMaintenanceHistory(data.maintenanceHistory || []);
 
       if (data.asset.isShared) {
         const bRes = await api.get(`/bookings/assets/${params.id}`);
@@ -81,6 +103,21 @@ export default function AssetDetailPage() {
       setError('Failed to fetch asset details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleSharedStatus = async () => {
+    if (!asset) return;
+    try {
+      const newStatus = !asset.isShared;
+      await api.put(`/assets/${asset.id}`, { isShared: newStatus });
+      setAsset({ ...asset, isShared: newStatus });
+      if (newStatus && bookings.length === 0) {
+        const bRes = await api.get(`/bookings/assets/${params.id}`);
+        setBookings(bRes.data.bookings);
+      }
+    } catch (err) {
+      alert('Failed to update shared status');
     }
   };
 
@@ -127,10 +164,13 @@ export default function AssetDetailPage() {
     }
   };
 
-  const handleReturn = async (allocationId: string) => {
-    if (!confirm('Are you sure you want to mark this asset as returned?')) return;
+  const handleReturn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeAllocation) return;
     try {
-      await api.put(`/allocations/${allocationId}/return`);
+      await api.put(`/allocations/${activeAllocation.id}/return`, returnData);
+      setShowReturnModal(false);
+      setReturnData({ returnNotes: '' });
       fetchAssetData();
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to return asset');
@@ -154,6 +194,7 @@ export default function AssetDetailPage() {
     try {
       await api.post('/maintenance', { assetId: asset?.id, ...reportData });
       setShowReportModal(false);
+      setReportData({ description: '', priority: 'MEDIUM', photoUrl: '' });
       alert('Maintenance request submitted successfully');
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to submit maintenance request');
@@ -164,9 +205,16 @@ export default function AssetDetailPage() {
   if (!asset) return <div className="p-8 text-center text-gray-500">Asset not found.</div>;
 
   const canManage = user?.role === 'ADMIN' || user?.role === 'ASSET_MANAGER';
-  const canRequestTransfer = asset.status === 'ALLOCATED'; 
+  // Dept Head can approve returns and view dept assets but not allocate
+  const canReturn = canManage || user?.role === 'DEPARTMENT_HEAD';
 
-  const activeAllocation = history.find(h => h.status === 'ACTIVE');
+  // activeAllocation must be declared before it is used below
+  const activeAllocation = history.find((h: any) => h.status === 'ACTIVE');
+
+  // Any user can request a transfer (employee initiates it, manager approves)
+  const canRequestTransfer = asset.status === 'ALLOCATED';
+  // Only the person holding the asset or managers can initiate a return request
+  const isHolder = activeAllocation?.assignedUserId === user?.id;
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
@@ -200,6 +248,12 @@ export default function AssetDetailPage() {
                   <div className="mt-2 flex items-center text-sm text-gray-500">
                     Category: {asset.category.name}
                   </div>
+                  {asset.isShared && (
+                    <div className="mt-2 flex items-center text-xs font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full ring-1 ring-inset ring-indigo-600/20">
+                      <CalendarClock className="h-3.5 w-3.5 mr-1" />
+                      Shared Bookable Resource
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -213,6 +267,16 @@ export default function AssetDetailPage() {
                   <CalendarClock className="h-4 w-4 mr-2" /> Book Resource
                 </button>
               )}
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={toggleSharedStatus}
+                  className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                >
+                  {asset.isShared ? 'Remove Bookable Status' : 'Make Bookable'}
+                </button>
+              )}
+              {/* Allocate: only Admin / Asset Manager */}
               {canManage && asset.status === 'AVAILABLE' && (
                 <button
                   type="button"
@@ -222,6 +286,7 @@ export default function AssetDetailPage() {
                   Allocate Asset
                 </button>
               )}
+              {/* Transfer: any user on an allocated asset */}
               {canRequestTransfer && (
                 <button
                   type="button"
@@ -231,15 +296,17 @@ export default function AssetDetailPage() {
                   Request Transfer
                 </button>
               )}
-              {canManage && activeAllocation && (
+              {/* Return: Admin/Asset Manager/Dept Head can mark returned */}
+              {canReturn && activeAllocation && (
                 <button
                   type="button"
-                  onClick={() => handleReturn(activeAllocation.id)}
+                  onClick={() => setShowReturnModal(true)}
                   className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
                 >
                   Mark Returned
                 </button>
               )}
+              {/* Report issue: all authenticated users */}
               <button
                 type="button"
                 onClick={() => setShowReportModal(true)}
@@ -250,10 +317,32 @@ export default function AssetDetailPage() {
             </div>
           </div>
 
+          {/* Conflict UI Banner */}
+          {asset.status === 'ALLOCATED' && activeAllocation && (
+            <div className="mb-8 rounded-md bg-yellow-50 p-4 border border-yellow-200">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <User className="h-5 w-5 text-yellow-400" aria-hidden="true" />
+                </div>
+                <div className="ml-3 flex-1 md:flex md:justify-between">
+                  <p className="text-sm text-yellow-700">
+                    This asset is currently held by <span className="font-bold">{activeAllocation.assignedUser || activeAllocation.assignedDept}</span>. 
+                    You cannot allocate it until it is returned. If you need it immediately, please use the Request Transfer button.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             
             {/* Details Card */}
             <div className="lg:col-span-1 bg-white shadow-sm ring-1 ring-gray-900/5 sm:rounded-xl">
+              {asset.photoUrl && (
+                <div className="w-full h-48 bg-gray-100 rounded-t-xl overflow-hidden border-b border-gray-100">
+                  <img src={asset.photoUrl} alt={asset.name} className="w-full h-full object-cover" />
+                </div>
+              )}
               <div className="px-4 py-5 sm:p-6">
                 <h3 className="text-base font-semibold leading-6 text-gray-900 mb-4">Asset Details</h3>
                 <dl className="space-y-4 text-sm leading-6">
@@ -278,9 +367,21 @@ export default function AssetDetailPage() {
                     <dt className="text-gray-500">Location</dt>
                     <dd className="font-medium text-gray-900">{asset.location || 'N/A'}</dd>
                   </div>
-                  <div className="flex justify-between gap-x-4">
+                  <div className="flex justify-between gap-x-4 border-b border-gray-100 pb-4">
                     <dt className="text-gray-500">Shared Resource</dt>
                     <dd className="font-medium text-gray-900">{asset.isShared ? 'Yes' : 'No'}</dd>
+                  </div>
+                  <div className="flex justify-between gap-x-4 border-b border-gray-100 pb-4">
+                    <dt className="text-gray-500">Acquisition Date</dt>
+                    <dd className="font-medium text-gray-900">
+                      {asset.acquisitionDate ? new Date(asset.acquisitionDate).toLocaleDateString() : 'N/A'}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-x-4">
+                    <dt className="text-gray-500">Acquisition Cost</dt>
+                    <dd className="font-medium text-gray-900">
+                      {asset.acquisitionCost ? `$${asset.acquisitionCost.toFixed(2)}` : 'N/A'}
+                    </dd>
                   </div>
                 </dl>
               </div>
@@ -359,9 +460,72 @@ export default function AssetDetailPage() {
                                       {event.status === 'RETURNED' && ' (Returned)'}
                                       {event.status === 'TRANSFERRED' && ' (Transferred)'}
                                     </p>
+                                    {event.returnNotes && (
+                                      <p className="text-xs text-gray-500 mt-1 italic">
+                                        Return Notes: {event.returnNotes}
+                                      </p>
+                                    )}
                                   </div>
                                   <div className="whitespace-nowrap text-right text-sm text-gray-500">
                                     <time dateTime={event.allocatedAt}>{new Date(event.allocatedAt).toLocaleDateString()}</time>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Maintenance History */}
+              <div className="bg-white shadow-sm ring-1 ring-gray-900/5 sm:rounded-xl">
+                <div className="px-4 py-5 sm:p-6">
+                  <h3 className="text-base font-semibold leading-6 text-gray-900 mb-6 flex items-center gap-2">
+                    <Wrench className="h-5 w-5 text-gray-400" /> Maintenance History
+                  </h3>
+                  
+                  {maintenanceHistory.length === 0 ? (
+                    <p className="text-sm text-gray-500">No maintenance records for this asset.</p>
+                  ) : (
+                    <div className="flow-root">
+                      <ul role="list" className="-mb-8">
+                        {maintenanceHistory.map((event, eventIdx) => (
+                          <li key={event.id}>
+                            <div className="relative pb-8">
+                              {eventIdx !== maintenanceHistory.length - 1 ? (
+                                <span className="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true" />
+                              ) : null}
+                              <div className="relative flex space-x-3">
+                                <div>
+                                  <span className={`h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white ${
+                                    event.status === 'RESOLVED' ? 'bg-green-500' :
+                                    event.status === 'PENDING' ? 'bg-yellow-500' : 'bg-blue-500'
+                                  }`}>
+                                    <Wrench className="h-4 w-4 text-white" />
+                                  </span>
+                                </div>
+                                <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
+                                  <div>
+                                    <p className="text-sm text-gray-900 font-medium">
+                                      {event.description}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      Status: <span className="font-semibold">{event.status}</span>
+                                      {event.priority && ` • Priority: ${event.priority}`}
+                                      {event.technicianName && ` • Tech: ${event.technicianName}`}
+                                      {event.notes && ` • Notes: ${event.notes}`}
+                                    </p>
+                                    {event.photoUrl && (
+                                      <div className="mt-2">
+                                        <img src={event.photoUrl} alt="Issue" className="h-20 w-20 object-cover rounded-md border border-gray-200" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="whitespace-nowrap text-right text-sm text-gray-500">
+                                    <time dateTime={event.createdAt}>{new Date(event.createdAt).toLocaleDateString()}</time>
                                   </div>
                                 </div>
                               </div>
@@ -414,7 +578,7 @@ export default function AssetDetailPage() {
                 <div>
                   <label className="block text-sm font-medium leading-6 text-gray-900">Expected Return Date</label>
                   <input
-                    type="date"
+                    type="datetime-local"
                     value={allocateData.expectedReturnDate}
                     onChange={e => setAllocateData({...allocateData, expectedReturnDate: e.target.value})}
                     className="mt-1 block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6"
@@ -452,6 +616,31 @@ export default function AssetDetailPage() {
                 <div className="mt-6 flex justify-end gap-3">
                   <button type="button" onClick={() => setShowTransferModal(false)} className="px-3 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-50 rounded-md">Cancel</button>
                   <button type="submit" className="px-3 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-md">Submit Request</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Return Modal */}
+        {showReturnModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Return Asset</h3>
+              <form onSubmit={handleReturn} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium leading-6 text-gray-900">Condition Check-in Notes</label>
+                  <textarea
+                    rows={3}
+                    value={returnData.returnNotes}
+                    onChange={e => setReturnData({...returnData, returnNotes: e.target.value})}
+                    className="mt-1 block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    placeholder="e.g. Scratches on lid, missing charger..."
+                  />
+                </div>
+                <div className="mt-6 flex justify-end gap-3">
+                  <button type="button" onClick={() => setShowReturnModal(false)} className="px-3 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-50 rounded-md">Cancel</button>
+                  <button type="submit" className="px-3 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-md">Confirm Return</button>
                 </div>
               </form>
             </div>
@@ -509,6 +698,29 @@ export default function AssetDetailPage() {
                     onChange={e => setReportData({...reportData, description: e.target.value})}
                     className="mt-1 block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-red-600 sm:text-sm sm:leading-6"
                     placeholder="e.g. Screen is flickering..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium leading-6 text-gray-900">Priority</label>
+                  <select
+                    value={reportData.priority}
+                    onChange={e => setReportData({...reportData, priority: e.target.value})}
+                    className="mt-1 block w-full rounded-md border-0 py-1.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-red-600 sm:text-sm sm:leading-6"
+                  >
+                    <option value="LOW">Low</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="HIGH">High</option>
+                    <option value="CRITICAL">Critical</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium leading-6 text-gray-900">Photo URL (Optional)</label>
+                  <input
+                    type="url"
+                    value={reportData.photoUrl}
+                    onChange={e => setReportData({...reportData, photoUrl: e.target.value})}
+                    className="mt-1 block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-red-600 sm:text-sm sm:leading-6"
+                    placeholder="https://example.com/image.jpg"
                   />
                 </div>
                 <div className="mt-6 flex justify-end gap-3">

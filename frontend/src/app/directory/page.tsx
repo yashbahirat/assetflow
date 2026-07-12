@@ -2,22 +2,37 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { useAuth, User } from '@/context/AuthContext';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Topbar } from '@/components/layout/Topbar';
+import { Users, ShieldAlert } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+
+interface User {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  department: { name: string } | null;
+  createdAt: string;
+}
 
 export default function DirectoryPage() {
   const { user } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   const fetchUsers = async () => {
+    if (!user || user.role !== 'ADMIN') {
+      setLoading(false);
+      return;
+    }
+    
     try {
       const { data } = await api.get('/users');
       setUsers(data.users);
     } catch (err) {
-      setError('Failed to fetch users');
+      console.error('Failed to fetch users');
     } finally {
       setLoading(false);
     }
@@ -25,7 +40,7 @@ export default function DirectoryPage() {
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [user]);
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     try {
@@ -36,99 +51,79 @@ export default function DirectoryPage() {
     }
   };
 
-  if (loading) return null; // Or a loading spinner
+  if (loading) return null;
+
+  if (user?.role !== 'ADMIN') {
+    return (
+      <div className="flex h-screen bg-gray-50">
+        <Sidebar />
+        <div className="flex-1 p-8">
+          <h1 className="text-xl">Access Denied. Admin only.</h1>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
       <Sidebar />
-      <div className="flex flex-col flex-1 overflow-hidden">
+      <div className="flex flex-col flex-1 overflow-hidden relative">
         <Topbar />
+        
         <main className="flex-1 overflow-y-auto p-8">
-          <div className="sm:flex sm:items-center">
-            <div className="sm:flex-auto">
-              <h1 className="text-2xl font-bold leading-6 text-gray-900">Employee Directory</h1>
-              <p className="mt-2 text-sm text-gray-700">
-                A list of all users in the system including their name, department, email and role.
-              </p>
-            </div>
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight flex items-center gap-2">
+              <Users className="h-8 w-8 text-indigo-600" />
+              Employee Directory
+            </h1>
+            <p className="mt-2 text-sm text-gray-500">
+              Manage user accounts and promote employees to administrative roles.
+            </p>
           </div>
-          
-          {error && (
-            <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-lg">
-              {error}
-            </div>
-          )}
 
-          <div className="mt-8 flex flex-col">
-            <div className="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
-              <div className="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
-                <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
-                  <table className="min-w-full divide-y divide-gray-300">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
-                          Name
-                        </th>
-                        <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                          Department
-                        </th>
-                        <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                          Role
-                        </th>
-                        <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                          Joined
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200 bg-white">
-                      {users.map((person) => (
-                        <tr key={person.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
-                            <div className="flex items-center">
-                              <div className="h-10 w-10 flex-shrink-0">
-                                <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100">
-                                  <span className="font-medium leading-none text-indigo-700">
-                                    {person.firstName[0]}{person.lastName[0]}
-                                  </span>
-                                </span>
-                              </div>
-                              <div className="ml-4">
-                                <div className="font-medium text-gray-900">{person.firstName} {person.lastName}</div>
-                                <div className="text-gray-500">{person.email}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                            <div className="text-gray-900">{person.department?.name || 'Unassigned'}</div>
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                            {user?.role === 'ADMIN' && user.id !== person.id ? (
-                              <select
-                                value={person.role}
-                                onChange={(e) => handleRoleChange(person.id, e.target.value)}
-                                className="block w-full rounded-md border-0 py-1.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                              >
-                                <option value="EMPLOYEE">Employee</option>
-                                <option value="DEPARTMENT_HEAD">Department Head</option>
-                                <option value="ASSET_MANAGER">Asset Manager</option>
-                                <option value="ADMIN">Admin</option>
-                              </select>
-                            ) : (
-                              <span className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">
-                                {person.role}
-                              </span>
-                            )}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                            {/* @ts-ignore - Assuming createdAt exists in full payload, otherwise fallback */}
-                            {new Date(person.createdAt || Date.now()).toLocaleDateString()}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+          <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {users.map((u) => (
+                    <tr key={u.id}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{u.firstName} {u.lastName}</div>
+                        <div className="text-sm text-gray-500">{u.email}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {u.department?.name || '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(u.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <select
+                          value={u.role}
+                          onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                          disabled={u.id === user.id} // Prevent demoting oneself
+                          className={`mt-1 block w-full rounded-md border-0 py-1.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6 ${
+                            u.role === 'ADMIN' ? 'font-bold text-indigo-700' : ''
+                          }`}
+                        >
+                          <option value="EMPLOYEE">Employee</option>
+                          <option value="DEPARTMENT_HEAD">Department Head</option>
+                          <option value="ASSET_MANAGER">Asset Manager</option>
+                          <option value="ADMIN">Admin</option>
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </main>
