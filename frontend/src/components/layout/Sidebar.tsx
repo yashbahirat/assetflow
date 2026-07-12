@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, Package, Users, Building2, Settings, MonitorCheck } from "lucide-react";
+import { Home, Package, Users, Building2, Settings, MonitorCheck, ClipboardCheck } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,8 @@ const navigation = [
   { name: 'Assets', href: '/assets', icon: Package },
   { name: 'Directory', href: '/directory', icon: Users },
   { name: 'Departments', href: '/departments', icon: Building2 },
+  { name: 'Maintenance', href: '/maintenance', icon: MonitorCheck },
+  { name: 'Audits', href: '/audits', icon: ClipboardCheck },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 

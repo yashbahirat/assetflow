@@ -1,15 +1,53 @@
 "use client";
 
+import { useEffect, useState, useRef } from "react";
 import { Bell, Search, LogOut } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { api } from "@/lib/api";
+
+interface ActivityLog {
+  id: string;
+  action: string;
+  entityType: string;
+  createdAt: string;
+  user: { firstName: string, lastName: string };
+}
 
 export function Topbar() {
   const { user, logout } = useAuth();
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [logs, setLogs] = useState<ActivityLog[]>([]);
+  const notifRef = useRef<HTMLDivElement>(null);
 
   const getInitials = () => {
     if (!user) return "??";
     return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
   };
+
+  const fetchLogs = async () => {
+    try {
+      const { data } = await api.get('/analytics/activity');
+      setLogs(data.logs);
+    } catch (error) {
+      console.error('Failed to fetch notifications');
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchLogs();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <div className="sticky top-0 z-10 flex h-16 flex-shrink-0 items-center gap-x-4 border-b bg-white px-6 shadow-sm">
@@ -31,11 +69,41 @@ export function Topbar() {
           />
         </form>
         <div className="flex items-center gap-x-4 lg:gap-x-6">
-          <button type="button" className="-m-2.5 p-2.5 text-gray-400 hover:text-gray-500 relative">
-            <span className="sr-only">View notifications</span>
-            <Bell className="h-6 w-6" aria-hidden="true" />
-            <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
-          </button>
+          <div className="relative" ref={notifRef}>
+            <button 
+              type="button" 
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="-m-2.5 p-2.5 text-gray-400 hover:text-gray-500 relative"
+            >
+              <span className="sr-only">View notifications</span>
+              <Bell className="h-6 w-6" aria-hidden="true" />
+              {logs.length > 0 && (
+                <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
+              )}
+            </button>
+
+            {showNotifications && (
+              <div className="absolute right-0 mt-2 w-80 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none max-h-96 overflow-y-auto">
+                <div className="px-4 py-2 border-b border-gray-100">
+                  <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+                </div>
+                {logs.length === 0 ? (
+                  <div className="px-4 py-3 text-sm text-gray-500 text-center">No recent activity</div>
+                ) : (
+                  logs.map((log) => (
+                    <div key={log.id} className="px-4 py-3 border-b border-gray-50 hover:bg-gray-50">
+                      <p className="text-sm font-medium text-gray-900">
+                        {log.user.firstName} {log.user.lastName} <span className="text-gray-500 font-normal">{log.action}</span> {log.entityType}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {new Date(log.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
           
           <div className="hidden lg:block lg:h-6 lg:w-px lg:bg-gray-200" aria-hidden="true" />
           

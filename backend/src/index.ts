@@ -11,6 +11,8 @@ import assetRoutes from './routes/assetRoutes';
 import allocationRoutes from './routes/allocationRoutes';
 import bookingRoutes from './routes/bookingRoutes';
 import maintenanceRoutes from './routes/maintenanceRoutes';
+import analyticsRoutes from './routes/analyticsRoutes';
+import auditRoutes from './routes/auditRoutes';
 
 dotenv.config();
 
@@ -33,6 +35,8 @@ app.use('/api/assets', assetRoutes);
 app.use('/api/allocations', allocationRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/audits', auditRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
