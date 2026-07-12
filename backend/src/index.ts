@@ -7,6 +7,8 @@ import authRoutes from './routes/authRoutes';
 import departmentRoutes from './routes/departmentRoutes';
 import categoryRoutes from './routes/categoryRoutes';
 import userRoutes from './routes/userRoutes';
+import assetRoutes from './routes/assetRoutes';
+import allocationRoutes from './routes/allocationRoutes';
 
 dotenv.config();
 
@@ -25,6 +27,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/assets', assetRoutes);
+app.use('/api/allocations', allocationRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
