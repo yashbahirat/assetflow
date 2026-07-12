@@ -1,17 +1,21 @@
-import { LayoutDashboard, Users, Box, CalendarRange, Wrench, ShieldCheck, Settings } from "lucide-react";
+"use client";
+
+import { Home, Package, Users, Building2, Settings, MonitorCheck } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard, current: true },
-  { name: "Assets", href: "/assets", icon: Box, current: false },
-  { name: "Bookings", href: "/bookings", icon: CalendarRange, current: false },
-  { name: "Maintenance", href: "/maintenance", icon: Wrench, current: false },
-  { name: "Audits", href: "/audits", icon: ShieldCheck, current: false },
-  { name: "Directory", href: "/directory", icon: Users, current: false },
+  { name: 'Dashboard', href: '/', icon: Home },
+  { name: 'Assets', href: '/assets', icon: Package },
+  { name: 'Directory', href: '/directory', icon: Users },
+  { name: 'Departments', href: '/departments', icon: Building2 },
+  { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
 export function Sidebar() {
+  const pathname = usePathname();
+
   return (
     <div className="flex h-full w-64 flex-col border-r bg-white">
       <div className="flex h-16 shrink-0 items-center px-6">
@@ -26,12 +30,13 @@ export function Sidebar() {
         <nav className="flex-1 space-y-1">
           {navigation.map((item) => {
             const Icon = item.icon;
+            const isCurrent = pathname === item.href;
             return (
               <Link
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  item.current
+                  isCurrent
                     ? "bg-indigo-50 text-indigo-700"
                     : "text-gray-700 hover:bg-gray-100 hover:text-gray-900",
                   "group flex items-center gap-x-3 rounded-md px-3 py-2 text-sm font-medium transition-colors"
@@ -39,7 +44,7 @@ export function Sidebar() {
               >
                 <Icon
                   className={cn(
-                    item.current ? "text-indigo-700" : "text-gray-400 group-hover:text-gray-600",
+                    isCurrent ? "text-indigo-700" : "text-gray-400 group-hover:text-gray-600",
                     "h-5 w-5 shrink-0"
                   )}
                   aria-hidden="true"

@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/context/AuthContext";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+});
 
 export const metadata: Metadata = {
   title: "AssetFlow | Enterprise Asset Management",
-  description: "Track, allocate, and maintain physical assets and shared resources.",
+  description: "Centralized tracking of physical assets and shared resources.",
 };
 
 export default function RootLayout({
@@ -15,9 +19,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full bg-gray-50">
-      <body className={`${inter.className} h-full overflow-hidden`}>
-        {children}
+    <html lang="en">
+      <body className={`${inter.variable} font-sans antialiased bg-gray-50 text-gray-900`}>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );
